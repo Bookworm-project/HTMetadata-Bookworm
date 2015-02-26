@@ -69,6 +69,13 @@ with open(outDir + os.sep + "solr2bookwormCat_log_" + batchTime + ".txt", 'w') a
                     publication_country = ""
                     if row[17] in loc.marcCountryDict:
                         publication_country = loc.marcCountryDict[row[17]]
+                    else:
+                        publication_country = "unknown"
+
+                    if row[17] in loc.marcStateDict:
+                        publication_state = loc.marcStateDict[row[17]]
+                    else:
+                        publication_state = ""
 
                     # set default values in case a value is not available from solr
                     searchString = "unknown"
@@ -139,7 +146,8 @@ with open(outDir + os.sep + "solr2bookwormCat_log_" + batchTime + ".txt", 'w') a
                                 title = arr.contents[0].string
 
                             elif arr['name'] == "country_of_pub":
-                                publication_country = arr.contents[0].string
+                                if publication_country == "unknown":
+                                    publication_country = arr.contents[0].string
 
                             elif arr['name'] == "publication_place":
                                 publication_place = arr.contents[0].string
@@ -171,11 +179,11 @@ with open(outDir + os.sep + "solr2bookwormCat_log_" + batchTime + ".txt", 'w') a
                         if languages == []:
                             languages.append("unknown")
 
-                        searchString = "<a href='http://hdl.handle.net/2027/' + volumeId>" + title + "</a>"
+                        searchString = "<a href='http://hdl.handle.net/2027/" + volumeId + "'>" + title + "</a>"
 
-                        json.dump(OrderedDict([('date', date),('searchstring', searchString),('lc_classes', lc_classes),('lc_subclass', lc_subclasses),('fiction_nonfiction', fiction_nonfiction),('genres', genres),('languages', languages),('format', form),('is_gov_doc',is_gov_doc),('page_count_bin', page_count_bin),('word_count_bin', word_count_bin),('publication_country', publication_country),('publication_place', publication_place),('filename', filename)]), cat)
+
+                        json.dump(OrderedDict([('date', date),('searchstring', searchString),('lc_classes', lc_classes),('lc_subclass', lc_subclasses),('fiction_nonfiction', fiction_nonfiction),('genres', genres),('languages', languages),('format', form),('is_gov_doc',is_gov_doc),('page_count_bin', page_count_bin),('word_count_bin', word_count_bin),('publication_country', publication_country),('publication_state',publication_state),('publication_place', publication_place),('filename', filename)]), cat)
                         cat.write('\n')
-
 
                 lineNum+=1
                 if lineNum > endLine:
