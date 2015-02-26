@@ -86,6 +86,10 @@ with open(outDir + os.sep + "solr2bookwormCat_log_" + batchTime + ".txt", 'w') a
                     title = "unknown"
                     publication_place = "unknown"
                     date = row[16]
+                    if row[15] == 1:
+                        is_gov_doc = "Yes"
+                    else:
+                        is_gov_doc = "No"
 
                     # get information from Solr
                     solrRequest = urllib.request.Request(solrEndpoint + row[0])
@@ -174,7 +178,7 @@ with open(outDir + os.sep + "solr2bookwormCat_log_" + batchTime + ".txt", 'w') a
 
                         searchString = "<a href=\"http://babel.hathitrust.org/cgi/pt?id=" + volumeId + "\" target=\"_blank\">" + title + "</a>"
 
-                        json.dump(OrderedDict([('date', date),('searchstring', searchString),('lc_classes', lc_classes),('lc_subclass', lc_subclasses),('fiction_nonfiction', fiction_nonfiction),('genres', genres),('languages', languages),('format', form),('author_genders', genders),('page_count_bin', page_count_bin),('word_count_bin', word_count_bin),('publication_country', publication_country),('publication_place', publication_place),('filename', filename)]), cat)
+                        json.dump(OrderedDict([('date', date),('searchstring', searchString),('lc_classes', lc_classes),('lc_subclass', lc_subclasses),('fiction_nonfiction', fiction_nonfiction),('genres', genres),('languages', languages),('format', form),('is_gov_doc',is_gov_doc),('author_genders', genders),('page_count_bin', page_count_bin),('word_count_bin', word_count_bin),('publication_country', publication_country),('publication_place', publication_place),('filename', filename)]), cat)
                         cat.write('\n')
 
 

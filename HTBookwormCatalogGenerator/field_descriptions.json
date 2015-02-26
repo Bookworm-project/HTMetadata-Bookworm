@@ -60,6 +60,12 @@
   },
   {
     "datatype":"categorical",
+    "field":"is_gov_doc",
+    "unique":true,
+    "type":"text"
+  },
+  {
+    "datatype":"categorical",
     "field":"page_count_bin",
     "unique":true,
     "type":"text"
