@@ -138,11 +138,6 @@ with open(outDir + os.sep + "solr2bookwormCat_log_" + batchTime + ".txt", 'w') a
                             elif arr['name'] == "title_a":
                                 title = arr.contents[0].string
 
-                            elif arr['name'] == "htrc_gender":
-                                genderArr = arr.contents
-                                for gender in genderArr:
-                                    genders.append(gender.string)
-
                             elif arr['name'] == "country_of_pub":
                                 publication_country = arr.contents[0].string
 

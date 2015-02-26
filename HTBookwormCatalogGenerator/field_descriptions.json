@@ -54,12 +54,6 @@
   },
   {
     "datatype":"categorical",
-    "field":"author_genders",
-    "unique":false,
-    "type":"text"
-  },
-  {
-    "datatype":"categorical",
     "field":"is_gov_doc",
     "unique":true,
     "type":"text"
