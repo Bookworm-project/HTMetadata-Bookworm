@@ -122,10 +122,10 @@ for line in hathi:
                 record['publication_country'] = result['country_of_pub'][0]
 
             if 'htrc_pageCount' in result:
-                result['page_count_bin'] = u.getPageBin(int(result['htrc_pageCount']))
+                record['page_count_bin'] = u.getPageBin(int(result['htrc_pageCount']))
             
             if 'htrc_wordCount' in result:
-                result['word_count_bin'] = u.getPageBin(int(result['htrc_wordCount']))
+                record['word_count_bin'] = u.getWordBin(int(result['htrc_wordCount']))
 
         # add unknown value to empty arrays so they can be searched using filters
         for field in ['lc_classes', 'lc_subclass', 'genres', 'languages']:
