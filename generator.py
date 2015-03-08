@@ -38,11 +38,11 @@ solr = pysolr.Solr(args.solrEndpoint, timeout=10)
 cat = open(os.path.join(args.outDir, "jsoncatalog.txt"), 'w+')
 hathi = open(args.hathifile, 'r')
 
-lineNum = 1
+lineNum = 0
 # read in one line at a time, write out one json string at a time, logging progress
 for line in hathi:
+    lineNum+=1
     if lineNum < args.startLine:
-        lineNum += 1
         continue
     elif args.endLine > 0 and lineNum > args.endLine:
         break
@@ -135,8 +135,6 @@ for line in hathi:
         record['searchstring'] = "<a href='http://hdl.handle.net/2027/%s/'>%s</a>" % (volumeId, title)
 
         cat.write(json.dumps(record)+'\n')
-        #json.dump(OrderedDict([('date', date),('searchstring', searchString),('lc_classes', lc_classes),('lc_subclass', lc_subclasses),('fiction_nonfiction', fiction_nonfiction),('genres', genres),('languages', languages),('format', form),('is_gov_doc',is_gov_doc),('page_count_bin', page_count_bin),('word_count_bin', word_count_bin),('publication_country', publication_country),('publication_state',publication_state),('publication_place', publication_place),('filename', filename)]), cat)
-    lineNum+=1
 
 cat.close()
 hathi.close()
