@@ -11,8 +11,7 @@ import HTBookwormCatalogGenerator.classification as c
 import HTBookwormCatalogGenerator.location as loc
 import logging
 import argparse
-
-solrEndpoint = "http://chinkapin.pti.indiana.edu:9994/solr/meta/select/?q=id:"
+import pysolr
 
 # Get arguments
 parser = argparse.ArgumentParser()
@@ -21,6 +20,8 @@ parser.add_argument("--hathifile", help="location of HathiFile to parse", type=s
 parser.add_argument("--outDir", default=os.getcwd())
 parser.add_argument("--startLine", type=int, default = 0)
 parser.add_argument("--endLine", type=int, default = -1)
+parser.add_argument("--solrEndpoint", help="Which Solr endpoint should be queried for the API?",
+                    type=str, default = "http://chinkapin.pti.indiana.edu:9994/solr/meta/")
 
 args = parser.parse_args()
 
@@ -29,6 +30,9 @@ logging.basicConfig(filename=os.path.join(args.outDir, "solr2bookwormCat.log"),
                     filemode="a", level=logging.DEBUG)
 logging.info(args)
 
+# Set up PySolr
+solr = pysolr.Solr(args.solrEndpoint, timeout=10)
+
 # Prepare Input/output files
 cat = open(os.path.join(args.outDir, "jsoncatalog.txt"), 'w+')
 hathi = open(args.hathifile, 'r')
@@ -36,9 +40,10 @@ hathi = open(args.hathifile, 'r')
 lineNum = 1
 # read in one line at a time, write out one json string at a time, logging progress
 for line in hathi:
-    if args.endLine > 0 and lineNum > args.endLine:
-        break
-    elif lineNum < args.startLine:
+    if lineNum < args.startLine:
+        lineNum += 1
+        continue
+    elif args.endLine > 0 and lineNum > args.endLine:
         break
     elif lineNum >= args.startLine:
         logging.info("reading line number " + str(lineNum))
@@ -50,123 +55,79 @@ for line in hathi:
         # use volume id from hathifile
         volumeId = row[0]
 
-        # use publication_country from hathifile
-        publication_country = ""
-        if row[17] in loc.marcCountryDict:
-            publication_country = loc.marcCountryDict[row[17]]
-        else:
-            publication_country = "unknown"
-
-        if row[17] in loc.marcStateDict:
-            publication_state = loc.marcStateDict[row[17]]
-        else:
-            publication_state = ""
+        # Set defaults for output metadata record
+        record = {"date": row[16], "searchstring": "unknown", "lc_classes": [], "lc_subclass": [],
+                  "fiction_nonfiction": "unknown", "genres": [], "languages":[], "format": "unknown",
+                  "page_count_bin": "unknown", "word_count_bin": "unknown", 
+                  "publication_place": "unknown", "filename": cleanVolumeId}
+        
+        # use publication_country from hathifile first
+        record['publication_country'] = loc.marcCountryDict[row[17]] if row[17] in loc.marcCountryDict else "unknown"
+        record['publication_state'] = loc.marcStateDict[row[17]] if row[17] in loc.marcStateDict else ""
+        record['is_gov_doc'] = "Yes" if row[15] == 1 else "No"
 
         # set default values in case a value is not available from solr
-        searchString = "unknown"
-        lc_classes = []
-        lc_subclasses = []
-        fiction_nonfiction = "unknown"
-        genres = []
-        languages = []
-        serial = "unknown"
-        genders =[]
-        page_count_bin = "unknown"
-        word_count_bin = "unknown"
-        filename = cleanVolumeId
-        publicationDate = 0
+        #serial = "unknown"
+        #genders =[]
+        #publicationDate = 0
         title = "unknown"
-        publication_place = "unknown"
-        date = row[16]
-        if row[15] == 1:
-            is_gov_doc = "Yes"
-        else:
-            is_gov_doc = "No"
 
         # get information from Solr
-        solrRequest = urllib.request.Request(solrEndpoint + row[0])
-        solrResponse = urllib.request.urlopen(solrRequest)
-        soup = BeautifulSoup(solrResponse.read())
-        resultTag = soup.result
-        numFound = resultTag.attrs['numfound']
-        if u.is_int(numFound) and int(numFound) > 0:
-            #handle the arr elements
-            arrList = soup.find_all(name="arr")
-            for arr in arrList:
+        results = solr.search("id:%s" % row[0])
+        print(list(results))
+        if len(results) > 0:
+            for result in results:
+                if 'publishDate' in result:
+                    record['date'] = int(result['publishDate'][0])
 
-                if arr['name'] == "publishDate":
-                    if u.is_int(arr.contents[0].string):
-                        date = int(arr.contents[0].string)
-
-                elif arr['name'] == "callnumber":
-                    callNumberArr = arr.contents
-                    for callNumber in callNumberArr:
-                        classResponse = c.getClass(callNumber.string)
+                if "callnumber" in result:
+                    for callNumber in result['callnumber']:
+                        classResponse = c.getClass(callNumber)
                         if classResponse is not None:
-                            lc_classes.append(c.getClass(callNumber.string))
+                            record['lc_classes'].append(c.getClass(callNumber))
 
-                        subclassResponse = c.getSubclass(callNumber.string)
+                        subclassResponse = c.getSubclass(callNumber)
                         if subclassResponse is not None:
-                            lc_subclasses.append(c.getSubclass(callNumber.string))
+                            record['lc_subclass'].append(c.getSubclass(callNumber))
 
-                elif arr['name'] == "genre":
-                    genreArr = arr.contents
-                    for genre in genreArr:
-                        if genre.string == 'Fiction':
-                            fiction_nonfiction = 'Fiction'
-                        elif genre.string == 'Not fiction':
-                            fiction_nonfiction = 'Not fiction'
+                if "genre" in result:
+                    for genre in result['genre']:
+                        if genre == 'Fiction':
+                            record['fiction_nonfiction'] = 'Fiction'
+                        elif genre == 'Not fiction':
+                            record['fiction_nonfiction'] = 'Not fiction'
                         else:
-                            genres.append(genre.string)
+                            record['genres'].append(genre)
 
-                elif arr['name'] == "language":
-                    languageArr = arr.contents
-                    for language in languageArr:
-                        languages.append(language.string)
+                for key in ["format", "publication_place"]:
+                    # Doublecheck that solr returned the field
+                    if key in result:
+                        record[key] = result[key][0]
 
-                elif arr['name'] == "format":
-                    form = arr.contents[0].string
+                if "language" in result:
+                    record['languages'] = result["language"] # Use the full list
 
-                elif arr['name'] == "title_a":
-                    title = arr.contents[0].string
+                if "title_a" in result:
+                    title = result['title_a'][0]
 
-                elif arr['name'] == "country_of_pub":
-                    if publication_country == "unknown":
-                        publication_country = arr.contents[0].string
+                if 'country_of_pub' in result and record['publication_country'] == "unknown":
+                    record['publication_country'] = result['country_of_pub'][0]
 
-                elif arr['name'] == "publication_place":
-                    publication_place = arr.contents[0].string
-
-
-            # handle named int elements (not children of arr)
-            intList = soup.find_all(name="int")
-            for myInt in intList:
-                if myInt.has_attr('name'):
-                    if myInt['name'] == "htrc_pageCount":
-                        page_count_bin = u.getPageBin(int(myInt.contents[0].string))
-
-            # handle named long elements (not children of arr)
-            myLongList = soup.find_all(name="long")
-            for myLong in myLongList:
-                if myLong.has_attr('name'):
-                    if myLong['name'] == "htrc_wordCount":
-                        word_count_bin = u.getWordBin(int(myLong.contents[0].string))
+                if 'htrc_pageCount' in result:
+                    result['page_count_bin'] = u.getPageBin(int(result['htrc_pageCount']))
+                
+                if 'htrc_wordCount' in result:
+                    result['word_count_bin'] = u.getPageBin(int(result['htrc_wordCount']))
 
             # add unknown value to empty arrays so they can be searched using filters
-            if genders == []:
-                genders.append("unknown")
-            if lc_classes == []:
-                lc_classes.append("unknown")
-            if lc_subclasses == []:
-                lc_subclasses.append("unknown")
-            if genres == []:
-                genres.append("unknown")
-            if languages == []:
-                languages.append("unknown")
+            for field in ['lc_classes', 'lc_subclass', 'genres', 'languages']:
+                if len(record[field]) == 0:
+                    record[field] = ['unknown']
 
-            searchString = "<a href='http://hdl.handle.net/2027/" + volumeId + "'>" + title + "</a>"
+            record['searchstring'] = "<a href='http://hdl.handle.net/2027/%s/'>%s</a>" % (volumeId, title)
 
-            json.dump(OrderedDict([('date', date),('searchstring', searchString),('lc_classes', lc_classes),('lc_subclass', lc_subclasses),('fiction_nonfiction', fiction_nonfiction),('genres', genres),('languages', languages),('format', form),('is_gov_doc',is_gov_doc),('page_count_bin', page_count_bin),('word_count_bin', word_count_bin),('publication_country', publication_country),('publication_state',publication_state),('publication_place', publication_place),('filename', filename)]), cat)
+            print(json.dumps(record))
+            #json.dump(OrderedDict([('date', date),('searchstring', searchString),('lc_classes', lc_classes),('lc_subclass', lc_subclasses),('fiction_nonfiction', fiction_nonfiction),('genres', genres),('languages', languages),('format', form),('is_gov_doc',is_gov_doc),('page_count_bin', page_count_bin),('word_count_bin', word_count_bin),('publication_country', publication_country),('publication_state',publication_state),('publication_place', publication_place),('filename', filename)]), cat)
             cat.write('\n')
 
     lineNum+=1
