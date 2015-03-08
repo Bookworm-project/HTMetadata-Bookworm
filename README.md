@@ -4,7 +4,7 @@ HTBookwormCatalogGenerator
 
 Reads a hathifiles text file one line at a time, makes calls to HTRC's Solr Proxy API for additional metadata, and creates a catalog file files for use in generating a Bookworm based on HTRC texts.
 
-Usage: python3 generator.py hathifile outDirectory startLine endLine
+Usage: python3 generator.py [--hathifile hathifile] [--outDir outputDirectory] [--startLine startLine] [--endLine endLine]
 
 ## arguments:
 
