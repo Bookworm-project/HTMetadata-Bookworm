@@ -12,6 +12,7 @@ import HTBookwormCatalogGenerator.location as loc
 import logging
 import argparse
 import pysolr
+import re
 
 # Get arguments
 parser = argparse.ArgumentParser()
@@ -73,63 +74,68 @@ for line in hathi:
         title = "unknown"
 
         # get information from Solr
-        results = solr.search("id:%s" % row[0])
-        print(list(results))
-        if len(results) > 0:
-            for result in results:
-                if 'publishDate' in result:
-                    record['date'] = int(result['publishDate'][0])
+        try:
+            results = solr.search("id:%s" % re.escape(row[0]))
+        except Exception:
+            logging.exception("Problem with search for \"id:%s\"" % row[0])
+            continue
+        logging.debug(list(results))
 
-                if "callnumber" in result:
-                    for callNumber in result['callnumber']:
-                        classResponse = c.getClass(callNumber)
-                        if classResponse is not None:
-                            record['lc_classes'].append(c.getClass(callNumber))
+        if len(results) == 0:
+            continue
+        
+        for result in results:
+            if 'publishDate' in result:
+                record['date'] = int(result['publishDate'][0])
 
-                        subclassResponse = c.getSubclass(callNumber)
-                        if subclassResponse is not None:
-                            record['lc_subclass'].append(c.getSubclass(callNumber))
+            if "callnumber" in result:
+                for callNumber in result['callnumber']:
+                    classResponse = c.getClass(callNumber)
+                    if classResponse is not None:
+                        record['lc_classes'].append(c.getClass(callNumber))
 
-                if "genre" in result:
-                    for genre in result['genre']:
-                        if genre == 'Fiction':
-                            record['fiction_nonfiction'] = 'Fiction'
-                        elif genre == 'Not fiction':
-                            record['fiction_nonfiction'] = 'Not fiction'
-                        else:
-                            record['genres'].append(genre)
+                    subclassResponse = c.getSubclass(callNumber)
+                    if subclassResponse is not None:
+                        record['lc_subclass'].append(c.getSubclass(callNumber))
 
-                for key in ["format", "publication_place"]:
-                    # Doublecheck that solr returned the field
-                    if key in result:
-                        record[key] = result[key][0]
+            if "genre" in result:
+                for genre in result['genre']:
+                    if genre == 'Fiction':
+                        record['fiction_nonfiction'] = 'Fiction'
+                    elif genre == 'Not fiction':
+                        record['fiction_nonfiction'] = 'Not fiction'
+                    else:
+                        record['genres'].append(genre)
 
-                if "language" in result:
-                    record['languages'] = result["language"] # Use the full list
+            for key in ["format", "publication_place"]:
+                # Doublecheck that solr returned the field
+                if key in result:
+                    record[key] = result[key][0]
 
-                if "title_a" in result:
-                    title = result['title_a'][0]
+            if "language" in result:
+                record['languages'] = result["language"] # Use the full list
 
-                if 'country_of_pub' in result and record['publication_country'] == "unknown":
-                    record['publication_country'] = result['country_of_pub'][0]
+            if "title_a" in result:
+                title = result['title_a'][0]
 
-                if 'htrc_pageCount' in result:
-                    result['page_count_bin'] = u.getPageBin(int(result['htrc_pageCount']))
-                
-                if 'htrc_wordCount' in result:
-                    result['word_count_bin'] = u.getPageBin(int(result['htrc_wordCount']))
+            if 'country_of_pub' in result and record['publication_country'] == "unknown":
+                record['publication_country'] = result['country_of_pub'][0]
 
-            # add unknown value to empty arrays so they can be searched using filters
-            for field in ['lc_classes', 'lc_subclass', 'genres', 'languages']:
-                if len(record[field]) == 0:
-                    record[field] = ['unknown']
+            if 'htrc_pageCount' in result:
+                result['page_count_bin'] = u.getPageBin(int(result['htrc_pageCount']))
+            
+            if 'htrc_wordCount' in result:
+                result['word_count_bin'] = u.getPageBin(int(result['htrc_wordCount']))
 
-            record['searchstring'] = "<a href='http://hdl.handle.net/2027/%s/'>%s</a>" % (volumeId, title)
+        # add unknown value to empty arrays so they can be searched using filters
+        for field in ['lc_classes', 'lc_subclass', 'genres', 'languages']:
+            if len(record[field]) == 0:
+                record[field] = ['unknown']
 
-            print(json.dumps(record))
-            #json.dump(OrderedDict([('date', date),('searchstring', searchString),('lc_classes', lc_classes),('lc_subclass', lc_subclasses),('fiction_nonfiction', fiction_nonfiction),('genres', genres),('languages', languages),('format', form),('is_gov_doc',is_gov_doc),('page_count_bin', page_count_bin),('word_count_bin', word_count_bin),('publication_country', publication_country),('publication_state',publication_state),('publication_place', publication_place),('filename', filename)]), cat)
-            cat.write('\n')
+        record['searchstring'] = "<a href='http://hdl.handle.net/2027/%s/'>%s</a>" % (volumeId, title)
 
+        cat.write(json.dumps(record)+'\n')
+        #json.dump(OrderedDict([('date', date),('searchstring', searchString),('lc_classes', lc_classes),('lc_subclass', lc_subclasses),('fiction_nonfiction', fiction_nonfiction),('genres', genres),('languages', languages),('format', form),('is_gov_doc',is_gov_doc),('page_count_bin', page_count_bin),('word_count_bin', word_count_bin),('publication_country', publication_country),('publication_state',publication_state),('publication_place', publication_place),('filename', filename)]), cat)
     lineNum+=1
 
 cat.close()
