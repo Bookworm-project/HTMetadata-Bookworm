@@ -14,129 +14,177 @@ import argparse
 import pysolr
 import re
 
-# Get arguments
-parser = argparse.ArgumentParser()
-parser.add_argument("--hathifile", help="location of HathiFile to parse", type=str,
-                    default = "hathifile.txt")
-parser.add_argument("--outDir", default=os.getcwd())
-parser.add_argument("--startLine", type=int, default = 0)
-parser.add_argument("--endLine", type=int, default = -1)
-parser.add_argument("--solrEndpoint", help="Which Solr endpoint should be queried for the API?",
-                    type=str, default = "http://chinkapin.pti.indiana.edu:9994/solr/meta/")
+def main():
+    # Get arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--hathifile", help="location of HathiFile to parse", type=str,
+                        default = "hathifile.txt")
+    parser.add_argument("--outDir", default=os.getcwd())
+    parser.add_argument("--startLine", type=int, default = 0)
+    parser.add_argument("--endLine", type=int, default = -1)
+    parser.add_argument("--solrEndpoint", help="Which Solr endpoint should be queried for the API?",
+                        type=str, default = "http://chinkapin.pti.indiana.edu:9994/solr/meta/")
 
-args = parser.parse_args()
+    args = parser.parse_args()
 
-# Set up logger
-logging.basicConfig(filename=os.path.join(args.outDir, "solr2bookwormCat.log"),
-                    filemode="a", level=logging.DEBUG)
-logging.info(args)
+    # Set up logger
+    logging.basicConfig(filename=os.path.join(args.outDir, "solr2bookwormCat.log"),
+                        filemode="a", level=logging.INFO) # Change to LOGGING.DEBUG for verbose msgs
+    logging.info(args)
 
-# Set up PySolr
-solr = pysolr.Solr(args.solrEndpoint, timeout=10)
+    # Set up PySolr
+    solr = pysolr.Solr(args.solrEndpoint, timeout=10)
 
-# Prepare Input/output files
-cat = open(os.path.join(args.outDir, "jsoncatalog.txt"), 'w+')
-hathi = open(args.hathifile, 'r')
+    # Prepare Input/output files
+    cat = open(os.path.join(args.outDir, "jsoncatalog.txt"), 'w+')
+    hathi = open(args.hathifile, 'r')
 
-lineNum = 0
-# read in one line at a time, write out one json string at a time, logging progress
-for line in hathi:
-    lineNum+=1
-    if lineNum < args.startLine:
-        continue
-    elif args.endLine > 0 and lineNum > args.endLine:
-        break
-    elif lineNum >= args.startLine:
-        logging.info("reading line number " + str(lineNum))
-        row = (line.split('\t'))
-        institutionId = (row[0].split('.'))[0]
-        cleanVolumeId = row[0].replace(':', "+")
-        cleanVolumeId = cleanVolumeId.replace('/', "=")
+    # Set defaults for output metadata record
+    DEFAULT_RECORD = {"searchstring": "unknown", "lc_classes": [], "lc_subclass": [],
+              "fiction_nonfiction": "unknown", "genres": [], "languages":[], "format": "unknown",
+              "page_count_bin": "unknown", "word_count_bin": "unknown", 
+              "publication_place": "unknown"}
 
-        # use volume id from hathifile
-        volumeId = row[0]
-
-        # Set defaults for output metadata record
-        record = {"date": row[16], "searchstring": "unknown", "lc_classes": [], "lc_subclass": [],
-                  "fiction_nonfiction": "unknown", "genres": [], "languages":[], "format": "unknown",
-                  "page_count_bin": "unknown", "word_count_bin": "unknown", 
-                  "publication_place": "unknown", "filename": cleanVolumeId}
-        
-        # use publication_country from hathifile first
-        record['publication_country'] = loc.marcCountryDict[row[17]] if row[17] in loc.marcCountryDict else "unknown"
-        record['publication_state'] = loc.marcStateDict[row[17]] if row[17] in loc.marcStateDict else ""
-        record['is_gov_doc'] = "Yes" if row[15] == 1 else "No"
-
-        # set default values in case a value is not available from solr
-        #serial = "unknown"
-        #genders =[]
-        #publicationDate = 0
-        title = "unknown"
-
-        # get information from Solr
-        try:
-            results = solr.search("id:%s" % re.escape(row[0]))
-        except Exception:
-            logging.exception("Problem with search for \"id:%s\"" % row[0])
+    lineNum = 0
+    volids = [] # list for collecting volume IDs to search in batches
+    records = {}
+    batch_size = 40
+    # read in one line at a time, write out one json string at a time, logging progress
+    for line in hathi:
+        lineNum+=1
+        if lineNum < args.startLine:
             continue
-        logging.debug(list(results))
+        elif args.endLine > 0 and lineNum > args.endLine:
+            break
+        elif lineNum >= args.startLine:
+            logging.debug("reading line number " + str(lineNum))
+            row = (line.split('\t'))
+            institutionId = (row[0].split('.'))[0]
+            cleanVolumeId = row[0].replace(':', "+")
+            cleanVolumeId = cleanVolumeId.replace('/', "=")
 
-        if len(results) == 0:
-            continue
-        
-        for result in results:
-            if 'publishDate' in result:
-                record['date'] = int(result['publishDate'][0])
-
-            if "callnumber" in result:
-                for callNumber in result['callnumber']:
-                    classResponse = c.getClass(callNumber)
-                    if classResponse is not None:
-                        record['lc_classes'].append(c.getClass(callNumber))
-
-                    subclassResponse = c.getSubclass(callNumber)
-                    if subclassResponse is not None:
-                        record['lc_subclass'].append(c.getSubclass(callNumber))
-
-            if "genre" in result:
-                for genre in result['genre']:
-                    if genre == 'Fiction':
-                        record['fiction_nonfiction'] = 'Fiction'
-                    elif genre == 'Not fiction':
-                        record['fiction_nonfiction'] = 'Not fiction'
-                    else:
-                        record['genres'].append(genre)
-
-            for key in ["format", "publication_place"]:
-                # Doublecheck that solr returned the field
-                if key in result:
-                    record[key] = result[key][0]
-
-            if "language" in result:
-                record['languages'] = result["language"] # Use the full list
-
-            if "title_a" in result:
-                title = result['title_a'][0]
-
-            if 'country_of_pub' in result and record['publication_country'] == "unknown":
-                record['publication_country'] = result['country_of_pub'][0]
-
-            if 'htrc_pageCount' in result:
-                record['page_count_bin'] = u.getPageBin(int(result['htrc_pageCount']))
+            # use volume id from hathifile
+            volumeId = row[0]
+            volids += [volumeId]
             
-            if 'htrc_wordCount' in result:
-                record['word_count_bin'] = u.getWordBin(int(result['htrc_wordCount']))
+            record = DEFAULT_RECORD.copy()
+            # Hathifile derived record info
+            record['date'] = row[16]
+            record['filename'] = cleanVolumeId
+            record['publication_country'] = loc.marcCountryDict[row[17]] if row[17] in loc.marcCountryDict else "unknown"
+            record['publication_state'] = loc.marcStateDict[row[17]] if row[17] in loc.marcStateDict else ""
+            record['is_gov_doc'] = "Yes" if row[15] == 1 else "No"
 
-        # add unknown value to empty arrays so they can be searched using filters
-        for field in ['lc_classes', 'lc_subclass', 'genres', 'languages']:
-            if len(record[field]) == 0:
-                record[field] = ['unknown']
+            # Save record to records object, where we'll hold it until we query the Solr
+            records[volumeId] = record
 
-        record['searchstring'] = "<a href='http://hdl.handle.net/2027/%s/'>%s</a>" % (volumeId, title)
+            # set default values in case a value is not available from solr
+            #serial = "unknown"
+            #genders =[]
+            #publicationDate = 0
 
+            if len(volids) >= batch_size:
+                logging.info("%d records collected, Querying solr now." % batch_size)
+                results = querySolr(volids, solr)
+                for result in results:
+                    htfile_record = records[result['id']]
+                    record = build_record(volumeId, result, htfile_record)
+                    cat.write(json.dumps(record)+'\n')
+                volids = []
+                records = {}
+
+    # Process any outstanding files
+    results = querySolr(volids, solr)
+    for result in results:
+        htfile_record = records[result['id']]
+        record = build_record(results, htfile_record)
         cat.write(json.dumps(record)+'\n')
 
-cat.close()
-hathi.close()
-logging.info("done")
+    cat.close()
+    hathi.close()
+    logging.info("done")
 
+def querySolr(volids, solr):
+    ''' Queries multiple solr ids at once. Returns empty list when there are no results.'''
+    if len(volids) == 0:
+        return []
+
+    # Make volume ids into query string
+    q = "id:(%s)" % " ".join([re.escape(volid) for volid in volids])
+
+    # get information from Solr
+    try:
+        results = solr.search(q)
+    except Exception:
+        logging.exception("Problem with search for \"%s\"" % q)
+        return []
+    logging.debug(list(results))
+
+    if len(results) == 0:
+        return []
+    return results 
+    
+
+def build_record(volumeId, result, record):
+    ''' 
+    Process Solr API results
+    results : JSON object of results from Solr
+    records : object of HATHI derived record information, to augment with Solr info and
+              write to jsoncatalog.txt
+    '''
+
+    if 'publishDate' in result:
+        record['date'] = int(result['publishDate'][0])
+
+    if "callnumber" in result:
+        for callNumber in result['callnumber']:
+            classResponse = c.getClass(callNumber)
+            if classResponse is not None:
+                record['lc_classes'].append(c.getClass(callNumber))
+
+            subclassResponse = c.getSubclass(callNumber)
+            if subclassResponse is not None:
+                record['lc_subclass'].append(c.getSubclass(callNumber))
+
+    if "genre" in result:
+        for genre in result['genre']:
+            if genre == 'Fiction':
+                record['fiction_nonfiction'] = 'Fiction'
+            elif genre == 'Not fiction':
+                record['fiction_nonfiction'] = 'Not fiction'
+            else:
+                record['genres'].append(genre)
+
+    for key in ["format", "publication_place"]:
+        # Doublecheck that solr returned the field
+        if key in result:
+            record[key] = result[key][0]
+
+    if "language" in result:
+        record['languages'] = result["language"] # Use the full list
+
+    if "title_a" in result:
+        title = result['title_a'][0]
+    else:
+        title = "unknown"
+
+    if 'country_of_pub' in result and record['publication_country'] == "unknown":
+        record['publication_country'] = result['country_of_pub'][0]
+
+    if 'htrc_pageCount' in result:
+        record['page_count_bin'] = u.getPageBin(int(result['htrc_pageCount']))
+    
+    if 'htrc_wordCount' in result:
+        record['word_count_bin'] = u.getWordBin(int(result['htrc_wordCount']))
+
+    # add unknown value to empty arrays so they can be searched using filters
+    for field in ['lc_classes', 'lc_subclass', 'genres', 'languages']:
+        if len(record[field]) == 0:
+            record[field] = ['unknown']
+
+    record['searchstring'] = "<a href='http://hdl.handle.net/2027/%s/'>%s</a>" % (volumeId, title)
+    
+    return record
+
+if __name__ == '__main__':
+    main()
