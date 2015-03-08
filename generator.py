@@ -13,12 +13,15 @@ import logging
 import argparse
 import pysolr
 import re
+import sys
 
 def main():
     # Get arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--hathifile", help="location of HathiFile to parse", type=str,
-                        default = "hathifile.txt")
+    parser.add_argument("hathifile", nargs="?", help="location of HathiFile to parse", 
+                        type=argparse.FileType('r'), default=sys.stdin)
+    parser.add_argument("--outfile", nargs="?", help="Location to save output metadata. Bookworm wants jsoncatalog.txt, default is stdout.", 
+                        type=argparse.FileType('w'), default=sys.stdout)
     parser.add_argument("--outDir", default=os.getcwd())
     parser.add_argument("--startLine", type=int, default = 0)
     parser.add_argument("--endLine", type=int, default = -1)
@@ -35,10 +38,6 @@ def main():
     # Set up PySolr
     solr = pysolr.Solr(args.solrEndpoint, timeout=10)
 
-    # Prepare Input/output files
-    cat = open(os.path.join(args.outDir, "jsoncatalog.txt"), 'w+')
-    hathi = open(args.hathifile, 'r')
-
     # Set defaults for output metadata record
     DEFAULT_RECORD = {"searchstring": "unknown", "lc_classes": [], "lc_subclass": [],
               "fiction_nonfiction": "unknown", "genres": [], "languages":[], "format": "unknown",
@@ -50,7 +49,7 @@ def main():
     records = {}
     batch_size = 40
     # read in one line at a time, write out one json string at a time, logging progress
-    for line in hathi:
+    for line in args.hathifile:
         lineNum+=1
         if lineNum < args.startLine:
             continue
@@ -89,7 +88,7 @@ def main():
                 for result in results:
                     htfile_record = records[result['id']]
                     record = build_record(volumeId, result, htfile_record)
-                    cat.write(json.dumps(record)+'\n')
+                    args.outfile.write(json.dumps(record)+'\n')
                 volids = []
                 records = {}
 
@@ -98,10 +97,8 @@ def main():
     for result in results:
         htfile_record = records[result['id']]
         record = build_record(results, htfile_record)
-        cat.write(json.dumps(record)+'\n')
+        args.outfile.write(json.dumps(record)+'\n')
 
-    cat.close()
-    hathi.close()
     logging.info("done")
 
 def querySolr(volids, solr):
