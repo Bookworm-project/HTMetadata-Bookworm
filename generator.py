@@ -19,7 +19,7 @@ def main():
     # Get arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("hathifile", nargs="?", help="location of HathiFile to parse", 
-                        type=argparse.FileType('r'), default=sys.stdin)
+                        type=argparse.FileType('r', encoding='utf-8'), default=sys.stdin)
     parser.add_argument("--outfile", nargs="?", help="Location to save output metadata. Bookworm wants jsoncatalog.txt, default is stdout.", 
                         type=argparse.FileType('w'), default=sys.stdout)
     parser.add_argument("--outDir", default=os.getcwd())
@@ -96,7 +96,7 @@ def main():
     results = querySolr(volids, solr)
     for result in results:
         htfile_record = records[result['id']]
-        record = build_record(results, htfile_record)
+        record = build_record(volumeId, result, htfile_record)
         args.outfile.write(json.dumps(record)+'\n')
 
     logging.info("done")
