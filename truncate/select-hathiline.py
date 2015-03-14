@@ -3,20 +3,25 @@ Compare a sorted list of HT ids with lines in a sorted hathifile.
 
 '''
 import logging
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("hathifile", help="Sorted Hathifile",
+			type=argparse.FileType('r'))
+parser.add_argument("idlist", help="Sorted list of record ids to retrieve metadata for.",
+			type=argparse.FileType('r'))
+args = parser.parse_args()
 
 logging.basicConfig(filename="select.log", level=logging.INFO)
 
-ht = open("sorted-hathifile.txt", "r+")
-bw = open("NGPD-ids-sorted.txt")
-
 count = 0
-for match in bw:
+for match in args.idlist:
     match = match.strip()
     logging.debug("Setting match as %s" % match)
     if len(match) == 0:
         continue
     while True:
-        l = ht.readline().strip()
+        l = args.hathifile.readline().strip()
         if not l:
             break
         compare = l[:len(match)]
