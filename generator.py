@@ -4,7 +4,6 @@ import datetime
 from collections import OrderedDict
 from bs4 import BeautifulSoup
 import os
-import urllib.request
 import sys
 import HTBookwormCatalogGenerator.util as u
 import HTBookwormCatalogGenerator.classification as c
@@ -47,7 +46,7 @@ def main():
     lineNum = 0
     volids = [] # list for collecting volume IDs to search in batches
     records = {}
-    batch_size = 40
+    batch_size = 20
     # read in one line at a time, write out one json string at a time, logging progress
     for line in args.hathifile:
         lineNum+=1
@@ -84,7 +83,7 @@ def main():
 
             if len(volids) >= batch_size:
                 logging.info("%d records collected, Querying solr now." % batch_size)
-                results = querySolr(volids, solr)
+                results = querySolr(volids, solr, batch_size)
                 for result in results:
                     htfile_record = records[result['id']]
                     record = build_record(volumeId, result, htfile_record)
@@ -93,7 +92,7 @@ def main():
                 records = {}
 
     # Process any outstanding files
-    results = querySolr(volids, solr)
+    results = querySolr(volids, solr, batch_size)
     for result in results:
         htfile_record = records[result['id']]
         record = build_record(volumeId, result, htfile_record)
@@ -101,7 +100,7 @@ def main():
 
     logging.info("done")
 
-def querySolr(volids, solr):
+def querySolr(volids, solr, rows):
     ''' Queries multiple solr ids at once. Returns empty list when there are no results.'''
     if len(volids) == 0:
         return []
@@ -111,7 +110,7 @@ def querySolr(volids, solr):
 
     # get information from Solr
     try:
-        results = solr.search(q)
+        results = solr.search(q, rows=rows)
     except Exception:
         logging.exception("Problem with search for \"%s\"" % q)
         return []
