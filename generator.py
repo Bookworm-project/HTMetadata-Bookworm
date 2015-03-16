@@ -96,7 +96,7 @@ def main():
     results = querySolr(volids, solr)
     for result in results:
         htfile_record = records[result['id']]
-        record = build_record(results, htfile_record)
+        record = build_record(result['id'],results, htfile_record)
         args.outfile.write(json.dumps(record)+'\n')
 
     logging.info("done")
