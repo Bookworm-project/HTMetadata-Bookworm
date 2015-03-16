@@ -31,4 +31,4 @@ Using Gnu parallel, you can run multiple processes asynchronously, with differen
 
 e.g. Send 1000 lines at a time to 10 simultaneous jobs.
 
-cat hathifile.txt | parallel -n1000 -j10 python3 generator.py >jsoncatalog.txt
+cat hathifile.txt | parallel --pipe -n1000 -j10 python3 generator.py >jsoncatalog.txt
