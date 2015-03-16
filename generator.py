@@ -96,7 +96,7 @@ def main():
     results = querySolr(volids, solr)
     for result in results:
         htfile_record = records[result['id']]
-        record = build_record(results, htfile_record)
+        record = build_record(result['id'],results, htfile_record)
         args.outfile.write(json.dumps(record)+'\n')
 
     logging.info("done")
@@ -143,6 +143,11 @@ def build_record(volumeId, result, record):
             if subclassResponse is not None:
                 record['lc_subclass'].append(c.getSubclass(callNumber))
 
+        # Only count each header once.
+        record['lc_classes'] = list(set(record['lc_classes']))
+        record['lc_subclass'] = list(set(record['lc_subclass']))
+
+
     if "genre" in result:
         for genre in result['genre']:
             if genre == 'Fiction':
@@ -151,6 +156,7 @@ def build_record(volumeId, result, record):
                 record['fiction_nonfiction'] = 'Not fiction'
             else:
                 record['genres'].append(genre)
+        record['genres'] = list(set(record['genres']))
 
     for key in ["format", "publication_place"]:
         # Doublecheck that solr returned the field
