@@ -81,7 +81,7 @@
     "field":"publication_state",
     "unique":true,
     "type":"text"
-  }
+  },
   {
     "datatype":"categorical",
     "field":"publication_place",
