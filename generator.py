@@ -144,9 +144,6 @@ def build_record(volumeId, result, record):
                 record['lc_subclass'].append(c.getSubclass(callNumber))
 
         # Only count each header once.
-        record['lc_classes'] = list(set(record['lc_classes']))
-        record['lc_subclass'] = list(set(record['lc_subclass']))
-
 
     if "genre" in result:
         for genre in result['genre']:
@@ -156,7 +153,6 @@ def build_record(volumeId, result, record):
                 record['fiction_nonfiction'] = 'Not fiction'
             else:
                 record['genres'].append(genre)
-        record['genres'] = list(set(record['genres']))
 
     for key in ["format", "publication_place"]:
         # Doublecheck that solr returned the field
@@ -180,8 +176,11 @@ def build_record(volumeId, result, record):
     if 'htrc_wordCount' in result:
         record['word_count_bin'] = u.getWordBin(int(result['htrc_wordCount']))
 
-    # add unknown value to empty arrays so they can be searched using filters
+
     for field in ['lc_classes', 'lc_subclass', 'genres', 'languages']:
+        # eliminate duplicates
+        record[field] = list(set(record[field]))
+        # add unknown value to empty arrays so they can be searched using filters
         if len(record[field]) == 0:
             record[field] = ['unknown']
 
