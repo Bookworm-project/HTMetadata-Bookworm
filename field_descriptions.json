@@ -48,8 +48,31 @@
   },
   {
     "datatype":"categorical",
+    "field":"htsource",
+    "unique":false,
+    "type":"text"
+  },
+  {
+    "datatype":"categorical",
+    "field":"mainauthor",
+    "unique":false,
+    "type":"text"
+  },  {
+    "datatype":"categorical",
+    "field":"publisher",
+    "unique":false,
+    "type":"text"
+  },
+  {
+    "datatype":"categorical",
+    "field":"htrc_gender",
+    "unique":false,
+    "type":"text"
+  },
+  {
+    "datatype":"categorical",
     "field":"format",
-    "unique":true,
+    "unique":false,
     "type":"text"
   },
   {
