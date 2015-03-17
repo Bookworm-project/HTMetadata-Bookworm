@@ -160,6 +160,7 @@ def build_record(volumeId, result, record):
     if "language" in result:
         record['languages'] = result["language"] # Use the full list
 
+ 
     if "title_a" in result:
         title = result['title_a'][0]
     else:
@@ -174,7 +175,16 @@ def build_record(volumeId, result, record):
     if 'htrc_wordCount' in result:
         record['word_count_bin'] = u.getWordBin(int(result['htrc_wordCount']))
 
-    for field in ['lc_classes', 'lc_subclass', 'genres', 'languages']:
+    
+    multi_fields = ["htsource","mainauthor","publisher","format","htrc_gender"]
+    
+    for field in multi_fields:
+        try:
+            record[field] = result[field]
+        except KeyError:
+            record[field] = []
+
+    for field in ['lc_classes', 'lc_subclass', 'genres', 'languages'] + multi_fields:
         # eliminate duplicates
         record[field] = list(set(record[field]))
         # add unknown value to empty arrays so they can be searched using filters
