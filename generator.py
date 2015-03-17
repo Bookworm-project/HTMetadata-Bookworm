@@ -4,7 +4,6 @@ import datetime
 from collections import OrderedDict
 from bs4 import BeautifulSoup
 import os
-import urllib.request
 import sys
 import HTBookwormCatalogGenerator.util as u
 import HTBookwormCatalogGenerator.classification as c
@@ -19,7 +18,7 @@ def main():
     # Get arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("hathifile", nargs="?", help="location of HathiFile to parse", 
-                        type=argparse.FileType('r'), default=sys.stdin)
+                        type=argparse.FileType('r', encoding='utf-8'), default=sys.stdin)
     parser.add_argument("--outfile", nargs="?", help="Location to save output metadata. Bookworm wants jsoncatalog.txt, default is stdout.", 
                         type=argparse.FileType('w'), default=sys.stdout)
     parser.add_argument("--outDir", default=os.getcwd())
@@ -39,15 +38,11 @@ def main():
     solr = pysolr.Solr(args.solrEndpoint, timeout=10)
 
     # Set defaults for output metadata record
-    DEFAULT_RECORD = {"searchstring": "unknown", "lc_classes": [], "lc_subclass": [],
-              "fiction_nonfiction": "unknown", "genres": [], "languages":[], "format": "unknown",
-              "page_count_bin": "unknown", "word_count_bin": "unknown", 
-              "publication_place": "unknown"}
 
     lineNum = 0
     volids = [] # list for collecting volume IDs to search in batches
     records = {}
-    batch_size = 40
+    batch_size = 20
     # read in one line at a time, write out one json string at a time, logging progress
     for line in args.hathifile:
         lineNum+=1
@@ -66,7 +61,11 @@ def main():
             volumeId = row[0]
             volids += [volumeId]
             
-            record = DEFAULT_RECORD.copy()
+            record = {"searchstring": "unknown", "lc_classes": [], "lc_subclass": [],
+              "fiction_nonfiction": "unknown", "genres": [], "languages":[], "format": "unknown",
+              "page_count_bin": "unknown", "word_count_bin": "unknown", 
+              "publication_place": "unknown"}
+
             # Hathifile derived record info
             record['date'] = row[16]
             record['filename'] = cleanVolumeId
@@ -84,24 +83,24 @@ def main():
 
             if len(volids) >= batch_size:
                 logging.info("%d records collected, Querying solr now." % batch_size)
-                results = querySolr(volids, solr)
+                results = querySolr(volids, solr, batch_size)
                 for result in results:
                     htfile_record = records[result['id']]
-                    record = build_record(volumeId, result, htfile_record)
+                    record = build_record(result['id'], result, htfile_record)
                     args.outfile.write(json.dumps(record)+'\n')
                 volids = []
                 records = {}
 
     # Process any outstanding files
-    results = querySolr(volids, solr)
+    results = querySolr(volids, solr, batch_size)
     for result in results:
         htfile_record = records[result['id']]
-        record = build_record(result['id'],results, htfile_record)
+        record = build_record(volumeId, result, htfile_record)
         args.outfile.write(json.dumps(record)+'\n')
 
     logging.info("done")
 
-def querySolr(volids, solr):
+def querySolr(volids, solr, rows):
     ''' Queries multiple solr ids at once. Returns empty list when there are no results.'''
     if len(volids) == 0:
         return []
@@ -111,7 +110,7 @@ def querySolr(volids, solr):
 
     # get information from Solr
     try:
-        results = solr.search(q)
+        results = solr.search(q, rows=rows)
     except Exception:
         logging.exception("Problem with search for \"%s\"" % q)
         return []
@@ -160,6 +159,7 @@ def build_record(volumeId, result, record):
     if "language" in result:
         record['languages'] = result["language"] # Use the full list
 
+ 
     if "title_a" in result:
         title = result['title_a'][0]
     else:
@@ -174,8 +174,19 @@ def build_record(volumeId, result, record):
     if 'htrc_wordCount' in result:
         record['word_count_bin'] = u.getWordBin(int(result['htrc_wordCount']))
 
-    # add unknown value to empty arrays so they can be searched using filters
-    for field in ['lc_classes', 'lc_subclass', 'genres', 'languages']:
+    
+    multi_fields = ["htsource","mainauthor","publisher","format","htrc_gender"]
+    
+    for field in multi_fields:
+        try:
+            record[field] = result[field]
+        except KeyError:
+            record[field] = []
+
+    for field in ['lc_classes', 'lc_subclass', 'genres', 'languages'] + multi_fields:
+        # eliminate duplicates
+        record[field] = list(set(record[field]))
+        # add unknown value to empty arrays so they can be searched using filters
         if len(record[field]) == 0:
             record[field] = ['unknown']
 

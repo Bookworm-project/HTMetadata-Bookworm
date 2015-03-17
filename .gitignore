@@ -60,3 +60,9 @@ target/
 *.iml
 .idea/*
 
+hathi_full_20150301.txt.gz
+catalogworm
+input.txt
+jsoncatalog.txt
+realjsoncatalog.txt
+supplements
