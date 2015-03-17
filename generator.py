@@ -39,10 +39,6 @@ def main():
     solr = pysolr.Solr(args.solrEndpoint, timeout=10)
 
     # Set defaults for output metadata record
-    DEFAULT_RECORD = {"searchstring": "unknown", "lc_classes": [], "lc_subclass": [],
-              "fiction_nonfiction": "unknown", "genres": [], "languages":[], "format": "unknown",
-              "page_count_bin": "unknown", "word_count_bin": "unknown", 
-              "publication_place": "unknown"}
 
     lineNum = 0
     volids = [] # list for collecting volume IDs to search in batches
@@ -66,7 +62,11 @@ def main():
             volumeId = row[0]
             volids += [volumeId]
             
-            record = DEFAULT_RECORD.copy()
+            record = {"searchstring": "unknown", "lc_classes": [], "lc_subclass": [],
+              "fiction_nonfiction": "unknown", "genres": [], "languages":[], "format": "unknown",
+              "page_count_bin": "unknown", "word_count_bin": "unknown", 
+              "publication_place": "unknown"}
+
             # Hathifile derived record info
             record['date'] = row[16]
             record['filename'] = cleanVolumeId
@@ -87,7 +87,7 @@ def main():
                 results = querySolr(volids, solr)
                 for result in results:
                     htfile_record = records[result['id']]
-                    record = build_record(volumeId, result, htfile_record)
+                    record = build_record(result['id'], result, htfile_record)
                     args.outfile.write(json.dumps(record)+'\n')
                 volids = []
                 records = {}
