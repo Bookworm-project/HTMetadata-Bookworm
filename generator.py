@@ -143,8 +143,6 @@ def build_record(volumeId, result, record):
             if subclassResponse is not None:
                 record['lc_subclass'].append(c.getSubclass(callNumber))
 
-        # Only count each header once.
-
     if "genre" in result:
         for genre in result['genre']:
             if genre == 'Fiction':
@@ -175,7 +173,6 @@ def build_record(volumeId, result, record):
     
     if 'htrc_wordCount' in result:
         record['word_count_bin'] = u.getWordBin(int(result['htrc_wordCount']))
-
 
     for field in ['lc_classes', 'lc_subclass', 'genres', 'languages']:
         # eliminate duplicates
