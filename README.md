@@ -1,4 +1,19 @@
-HTBookwormCatalogGenerator
+HTMetadata-Bookworm
+==================
+
+
+This repo does two things:
+
+1. Builds the necessary `jsoncatalog.txt` files and `field_descriptions.json` for the full HTRC bookworm collaboration.
+2. Uses those files to build a running Bookworm instance with all the HTRC metadata, but using the titles instead of the full text for the words.
+
+The first is an important prior step to building the full HTRC bookworm.
+
+The second, the metadata bookworm is useful primarily as a debugging tool/test bed for the fuller HTRC collection.
+
+This is mostly internal code for the HTRC-Bookworm project, unlikely to be of broad interest.
+
+Description
 ==================
 
 
