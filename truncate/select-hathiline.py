@@ -15,13 +15,15 @@ args = parser.parse_args()
 logging.basicConfig(filename="select.log", level=logging.INFO)
 
 count = 0
+stripchars = ".:/,$"
 for match in args.idlist:
-    match = match.strip()
+    match = match.strip().translate(None, stripchars)
     logging.debug("Setting match as %s" % match)
     if len(match) == 0:
         continue
     while True:
-        l = args.hathifile.readline().strip()
+        htline = args.hathifile.readline().strip()
+        l = htline.translate(None, stripchars)
         if not l:
             break
         compare = l[:len(match)]
@@ -29,13 +31,12 @@ for match in args.idlist:
         count += 1
         if count % 100000 == 0:
             logging.info("%d Hathilines read, current match is %s, current hathiline is %s" % (count, match, compare))
-        
         if match > compare:
             continue
         elif l.startswith(match):
-            print l
+            print htline
             break
         else:
-            logging.error("Somehow we missing %s in the Hathifile.")
+            logging.error("Somehow we missing %s in the Hathifile." % match)
             break
 
