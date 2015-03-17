@@ -25,6 +25,10 @@ Example of advanced usage with piping: head hathifile.txt | python3 generator.py
     - optional
     - default is the last line of the hathifile
 
+## Selecting specific Hathifiles
+
+To avoid pinging the HTRC Solr Proxy for 14 million records, you can trim your Hathifiles against a list a known ids. A script to do this is available in `truncate/select-hathiline.py`; note that both your hathifile and id list need to be sorted for it to work correctly.
+
 ## Parallel
 
 Using Gnu parallel, you can run multiple processes asynchronously, with different parts of the Hathifiles. Remember that it's still hitting a single server, so limit --jobs to something reasonable.
