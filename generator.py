@@ -190,8 +190,9 @@ def build_record(volumeId, result, record):
         if len(record[field]) == 0:
             record[field] = ['unknown']
 
-    record['searchstring'] = "<a href='http://hdl.handle.net/2027/%s/'>%s</a>" % (volumeId, title)
-    
+    record['searchstring'] = "<a href='http://hdl.handle.net/2027/%s'>%s</a>" % (volumeId, title)
+
+
     return record
 
 if __name__ == '__main__':
