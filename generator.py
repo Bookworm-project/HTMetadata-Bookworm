@@ -1,18 +1,16 @@
 import json
-import time
-import datetime
-from collections import OrderedDict
-from bs4 import BeautifulSoup
 import os
+import logging
+import argparse
+import re
 import sys
+
+import pysolr
+
 import HTBookwormCatalogGenerator.util as u
 import HTBookwormCatalogGenerator.classification as c
 import HTBookwormCatalogGenerator.location as loc
-import logging
-import argparse
-import pysolr
-import re
-import sys
+
 
 def main():
     # Get arguments
